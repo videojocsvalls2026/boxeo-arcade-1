@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Campeonato Mundial de Boxeo 360°</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            margin: 0;
+            padding: 0;
+            touch-action: manipulation;
+        }
+        body {
+            background-color: #121214;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: #ffffff;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            height: 600px;
+            background-color: #222;
+            display: flex;
+            flex-direction: column;
+            border: 4px solid #3a4257;
+            border-radius: 12px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+        }
+
+        /* HUD */
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px;
+            background-color: #0f1115;
+            border-bottom: 2px solid #2f3647;
+            z-index: 10;
+        }
+        .bar-container {
+            width: 120px;
+            height: 14px;
+            background-color: #1a202c;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #4a5568;
+            position: relative;
+        }
+        .bar {
+            height: 100%;
+            width: 100%;
+            transition: width 0.1s ease, background-color 0.1s ease;
+        }
+        #p-bar { background: linear-gradient(90deg, #3182ce, #63b3ed); }
+        #e-bar { background: linear-gradient(90deg, #e53e3e, #fc8181); }
+        
+        #round-display {
+            text-align: center;
+            font-size: 11px;
+            color: #a0aec0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+        }
+        .score {
+            font-size: 13px;
+            color: #ecc94b;
+            margin-top: 1px;
+        }
+        #timer {
+            font-size: 14px;
+            color: #fff;
+            font-weight: bold;
+            background-color: #1a202c;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-top: 2px;
+            border: 1px solid #4a5568;
+        }
+
+        /* El Ring */
+        #ring {
+            flex: 1;
+            position: relative;
+            background: radial-gradient(circle at 50% 50%, #333c4d 0%, #1a1f2c 100%);
+            border: 15px solid #b91c1c;
+            overflow: hidden;
+        }
+
+        /* DISEÑO ANATÓMICO */
+        .boxer {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            width: 70px;
+            height: 70px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.04s linear;
+        }
+
+        .boxer-body {
+            position: absolute;
+            width: 54px;
+            height: 26px;
+            border-radius: 50% / 40%;
+            background: radial-gradient(circle at 50% -20%, #ffdfc4 30%, #e0a980 90%);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+            z-index: 2;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 4px;
+        }
+
+        .boxer-head {
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 50% 30%, #ffe3cc 20%, #d49b70 100%);
+            z-index: 4;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+            border: 1px solid #c58e65;
+        }
+        .boxer-head::after {
+            content: '';
+            position: absolute;
+            top: 12px; left: 2px; right: 2px; bottom: 0;
+            background-color: #2d3748;
+            border-radius: 0 0 10px 10px;
+        }
+
+        /* SISTEMA DE BRAZOS */
+        .arm {
+            position: absolute;
+            bottom: 38px;
+            width: 12px;
+            height: 16px;
+            background: linear-gradient(to top, #ffdfc4, #e0a980);
+            border: 1px solid #c58e65;
+            border-radius: 4px;
+            z-index: 1;
+            transform-origin: bottom center;
+            transition: height 0.07s cubic-bezier(0.175, 0.885, 0.32, 1.275), transform 0.07s ease, bottom 0.1s ease;
+        }
+        .arm-l { left: 4px; }
+        .arm-r { right: 4px; }
+
+        .glove {
+            position: absolute;
+            top: -12px;
+            left: -2px;
+            width: 14px;
+            height: 15px;
+            border-radius: 50% 50% 40% 40%;
+            box-shadow: 0 3px 5px rgba(0,0,0,0.4);
+        }
+
+        .boxer.punch-left .arm-l { height: 48px; transform: scaleX(1.1); z-index: 5; }
+        .boxer.punch-right .arm-r { height: 48px; transform: scaleX(1.1); z-index: 5; }
+
+        /* POSTURA DE BLOQUEO */
+        .boxer.blocking .arm-l { bottom: 24px; transform: translateX(10px) rotate(25deg); z-index: 5; }
+        .boxer.blocking .arm-r { bottom: 24px; transform: translateX(-10px) rotate(-25deg); z-index: 5; }
+
+        #enemy .boxer-body { background: radial-gradient(circle at 50% 120%, #991b1b 40%, #ffe3cc 45%); }
+        #enemy .glove { background: radial-gradient(circle at 35% 35%, #f87171, #b91c1c); border: 1px solid #7f1d1d; }
+
+        /* ÁRBITRO */
+        .referee {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.1s ease-out;
+            z-index: 3;
+        }
+        .referee .boxer-body {
+            background: repeating-linear-gradient(90deg, #fff, #fff 6px, #111 6px, #111 12px);
+            width: 46px;
+            height: 24px;
+        }
+        .referee .boxer-head {
+            background: radial-gradient(circle at 50% 30%, #ffd0a8 20%, #b07e56 100%);
+            border: 1px solid #a07048;
+        }
+        .referee .boxer-head::after { display: none; }
+        .referee .arm { background: #ffd0a8; border: 1px solid #a07048; height: 14px; width: 8px; bottom: 34px; }
+        .referee .glove { background: #ffd0a8; border: none; box-shadow: none; width: 8px; height: 8px; top: -6px; left: 0; }
+
+        .referee.gest-alert .arm-l, .referee.gest-alert .arm-r { height: 32px; transform: rotate(15deg); }
+        .referee.gest-alert .arm-r { transform: rotate(-15deg); }
+        .referee.gest-count .arm-r { height: 40px; transform: rotate(-10deg); }
+
+        /* Controles */
+        #controls-area {
+            height: 160px;
+            background-color: #0f1115;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 5px 10px;
+            border-top: 2px solid #2f3647;
+        }
+        #joystick-zone { width: 105px; height: 105px; background-color: #1a202c; border-radius: 50%; position: relative; border: 3px solid #2f3647; }
+        #joystick-stick { width: 42px; height: 42px; background-color: #4a5568; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 4px 10px rgba(0,0,0,0.5); border: 2px solid #48bb78; }
+        
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        #btn-punch { width: 110px; height: 54px; background: linear-gradient(135deg, #ef4444, #991b1b); border: 2px solid #f87171; color: white; border-radius: 20px; font-size: 15px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3); }
+        #btn-block { width: 110px; height: 54px; background: linear-gradient(135deg, #2563eb, #1d4ed8); border: 2px solid #60a5fa; color: white; border-radius: 20px; font-size: 15px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3); }
+        
+        #btn-punch:active { transform: scale(0.95); }
+        #btn-block:active, #btn-block.active { transform: scale(0.95); background: #1e40af; }
+
+        /* Pantallas */
+        .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(10, 12, 16, 0.96); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 20; text-align: center; padding: 20px; border: 4px solid #2f3647; }
+        .hidden { display: none !important; }
+        #announcement-screen { background-color: rgba(15, 23, 42, 0.9); border: none; pointer-events: none; }
+        #announcement-text { font-size: 28px; color: #ecc94b; letter-spacing: 2px; }
+
+        /* LISTA SELECCIÓN */
+        .character-list { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 280px; margin-top: 20px; }
+        .char-card { background-color: #1a202c; border: 2px solid #4a5568; border-radius: 8px; padding: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s ease; }
+        .char-card:hover, .char-card.selected { border-color: #ecc94b; background-color: #2d3748; transform: scale(1.02); }
+        .char-info { text-align: left; }
+        .char-name { font-weight: bold; font-size: 14px; }
+        .char-stats { font-size: 11px; color: #a0aec0; margin-top: 2px; }
+        .char-preview { width: 30px; height: 30px; border-radius: 50%; }
+
+        button { background: linear-gradient(135deg, #3182ce, #2b6cb0); color: white; border: none; padding: 12px 30px; font-size: 15px; font-weight: bold; border-radius: 25px; cursor: pointer; margin-top: 20px; box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3); }
+        button:active { transform: scale(0.96); }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div class="hud">
+            <div>
+                <div id="player-hud-name" style="color: #63b3ed; font-size:11px; font-weight: bold; margin-bottom: 2px;">JUGADOR</div>
+                <div class="bar-container"><div id="p-bar" class="bar"></div></div>
+            </div>
+            <div id="round-display">
+                <span id="round-title">RDO 1/4</span>
+                <span id="round-score" class="score">0 - 0</span>
+                <span id="timer">02:00</span>
+            </div>
+            <div>
+                <div style="color: #fc8181; font-size:11px; font-weight: bold; margin-bottom: 2px; text-align: right;">RIVAL</div>
+                <div class="bar-container"><div id="e-bar" class="bar"></div></div>
+            </div>
+        </div>
+
+        <div id="ring">
+            <div id="referee" class="referee">
+                <div class="boxer-head"></div>
+                <div class="boxer-body"></div>
+                <div class="arm arm-l"><div class="glove"></div></div>
+                <div class="arm arm-r"><div class="glove"></div></div>
+            </div>
+
+            <div id="player" class="boxer">
+                <div class="boxer-head"></div>
+                <div class="boxer-body" id="p-body-style"></div>
+                <div class="arm arm-l"><div class="glove" id="p-glove-l"></div></div>
+                <div class="arm arm-r"><div class="glove" id="p-glove-r"></div></div>
+            </div>
+
+            <div id="enemy" class="boxer">
+                <div class="boxer-head"></div>
+                <div class="boxer-body"></div>
+                <div class="arm arm-l"><div class="glove"></div></div>
+                <div class="arm arm-r"><div class="glove"></div></div>
+            </div>
+        </div>
+
+        <div id="controls-area">
+            <div id="joystick-zone"><div id="joystick-stick"></div></div>
+            <div class="action-buttons">
+                <button id="btn-punch">GOLPE</button>
+                <button id="btn-block">BLOQUEO</button>
+            </div>
+        </div>
+
+        <div id="start-screen" class="screen">
+            <h2 style="color: #ecc94b; letter-spacing: 1px; font-size: 20px;">ELIGE TU LUCHADOR</h2>
+            
+            <div class="character-list">
+                <div class="char-card selected" onclick="selectCharacter(0, this)">
+                    <div class="char-info">
+                        <div class="char-name" style="color: #63b3ed;">AZUL VELOZ</div>
+                        <div class="char-stats">Velocidad: ★★★ | Fuerza: ★★☆</div>
+                    </div>
+                    <div class="char-preview" style="background: #1e40af; border: 2px solid #60a5fa;"></div>
+                </div>
+                
+                <div class="char-card" onclick="selectCharacter(1, this)">
+                    <div class="char-info">
+                        <div class="char-name" style="color: #48bb78;">TANQUE VERDE</div>
+                        <div class="char-stats">Velocidad: ★★☆ | Fuerza: ★★★</div>
+                    </div>
+                    <div class="char-preview" style="background: #065f46; border: 2px solid #34d399;"></div>
+                </div>
+
+                <div class="char-card" onclick="selectCharacter(2, this)">
+                    <div class="char-info">
+                        <div class="char-name" style="color: #b7791f;">RAYO ORO</div>
+                        <div class="char-stats">Velocidad: ★★★ | Fuerza: ★☆☆</div>
+                    </div>
+                    <div class="char-preview" style="background: #92400e; border: 2px solid #fbbf24;"></div>
+                </div>
+            </div>
+
+            <p style="color: #a0aec0; font-size: 11px; margin-top: 10px; padding: 0 10px;">
+                <b>PC:</b> Mover con <span style="color:#fff">WASD/Flechas</span>, golpear con <span style="color:#fff">Espacio</span> y bloquear con <span style="color:#fff">B</span>.<br>
+                <b>Móvil:</b> Usa el joystick y botones de pantalla.
+            </p>
+            <button onclick="startFullChampionship()">ENTRAR AL RING</button>
+        </div>
+
+        <div id="announcement-screen" class="screen hidden">
+            <h2 id="announcement-text">ASALTO 1</h2>
+        </div>
+
+        <div id="game-over-screen" class="screen hidden">
+            <h2 id="result-text">FIN DEL COMBATE</h2>
+            <button onclick="backToMenu()">VOLVER AL MENÚ</button>
+        </div>
+    </div>
+
+    <script>
+        const ring = document.getElementById('ring');
+        const playerEl = document.getElementById('player');
+        const enemyEl = document.getElementById('enemy');
+        const refereeEl = document.getElementById('referee');
+        
+        let ringBounds = ring.getBoundingClientRect();
+        window.addEventListener('resize', () => { ringBounds = ring.getBoundingClientRect(); });
+
+        const characters = [
+            { name: "AZUL VELOZ", speed: 4.0, power: 10, body: "radial-gradient(circle at 50% 120%, #1e40af 40%, #ffe3cc 45%)", glove: "radial-gradient(circle at 35% 35%, #60a5fa, #1d4ed8)", border: "1px solid #1e3a8a", hudColor: "#63b3ed" },
+            { name: "TANQUE VERDE", speed: 3.2, power: 15, body: "radial-gradient(circle at 50% 120%, #065f46 40%, #ffe3cc 45%)", glove: "radial-gradient(circle at 35% 35%, #34d399, #047857)", border: "1px solid #064e3b", hudColor: "#48bb78" },
+            { name: "RAYO ORO", speed: 4.6, power: 8, body: "radial-gradient(circle at 50% 120%, #92400e 40%, #ffe3cc 45%)", glove: "radial-gradient(circle at 35% 35%, #fbbf24, #b45309)", border: "1px solid #78350f", hudColor: "#b7791f" }
+        ];
+
+        let selectedCharIndex = 0;
+
+        let player = { x: 100, y: 200, hp: 100, baseSpeed: 3.8, speed: 3.8, power: 10, punching: false, blocking: false, leftToggle: true };
+        let enemy = { x: 250, y: 200, hp: 100, speed: 2.1, punching: false, leftToggle: true };
+        let ref = { x: 175, y: 100, speed: 3.5 }; 
+        
+        let keys = {};
+        let gameActive = false;
+        let loopInitiated = false;
+        let joystickActive = false;
+        let moveDir = { x: 0, y: 0 };
+
+        let currentRound = 1;
+        let playerRoundsWon = 0;
+        let enemyRoundsWon = 0;
+        let timeLeft = 120; 
+        let countdownInterval;
+
+        function selectCharacter(index, element) {
+            selectedCharIndex = index;
+            document.querySelectorAll('.char-card').forEach(card => card.classList.remove('selected'));
+            element.classList.add('selected');
+        }
+
+        function applyCharacterStyles() {
+            const char = characters[selectedCharIndex];
+            player.baseSpeed = char.speed;
+            player.speed = char.speed;
+            player.power = char.power;
+
+            const nameHud = document.getElementById('player-hud-name');
+            nameHud.innerText = char.name;
+            nameHud.style.color = char.hudColor;
+
+            document.getElementById('p-body-style').style.background = char.body;
+            const gLeft = document.getElementById('p-glove-l');
+            const gRight = document.getElementById('p-glove-r');
+            gLeft.style.background = char.glove; gLeft.style.border = char.border;
+            gRight.style.background = char.glove; gRight.style.border = char.border;
+        }
+
+        function playWhistleSound() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                const modulator = ctx.createOscillator();
+                const modGain = ctx.createGain();
+                
+                osc.type = 'sine'; osc.frequency.setValueAtTime(2200, ctx.currentTime);
+                modulator.type = 'sawtooth'; modulator.frequency.setValueAtTime(45, ctx.currentTime);
+                modGain.gain.setValueAtTime(150, ctx.currentTime);
+                
+                modulator.connect(modGain); modGain.connect(osc.frequency);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+                
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.start(); modulator.start();
+                osc.stop(ctx.currentTime + 0.6); modulator.stop(ctx.currentTime + 0.6);
+            } catch(e) {}
+        }
+
+        function startFullChampionship() {
+            applyCharacterStyles();
+            currentRound = 1; playerRoundsWon = 0; enemyRoundsWon = 0;
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            prepareRound();
+            if (!loopInitiated) { loopInitiated = true; requestAnimationFrame(gameLoop); }
+        }
+
+        function backToMenu() {
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('start-screen').classList.remove('hidden');
+        }
+
+        function prepareRound() {
+            gameActive = false;
+            clearInterval(countdownInterval);
+            ringBounds = ring.getBoundingClientRect();
+            
+            player.x = 80; player.y = ringBounds.height / 2; player.hp = 100; player.punching = false; player.blocking = false;
+            playerEl.classList.remove('blocking');
+            enemy.x = ringBounds.width - 80; enemy.y = ringBounds.height / 2; enemy.hp = 100; enemy.punching = false;
+            
+            ref.x = ringBounds.width / 2; ref.y = 50;
+            if (refereeEl) refereeEl.className = "referee gest-count";
+
+            updateHP(); timeLeft = 120; updateTimerDisplay();
+
+            document.getElementById('round-title').innerText = `RDO ${currentRound}/4`;
+            document.getElementById('round-score').innerText = `${playerRoundsWon} - ${enemyRoundsWon}`;
+
+            const announceScreen = document.getElementById('announcement-screen');
+            announceScreen.classList.remove('hidden');
+
+            setTimeout(() => {
+                announceScreen.classList.add('hidden');
+                if (refereeEl) refereeEl.classList.remove('gest-count');
+                gameActive = true;
+                startTimer();
+            }, 1500);
+        }
+
+        function startTimer() {
+            countdownInterval = setInterval(() => {
+                if (!gameActive) return;
+                timeLeft--; updateTimerDisplay();
+                if (timeLeft <= 0) { clearInterval(countdownInterval); endRound(player.hp > enemy.hp); }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            let minutes = Math.floor(timeLeft / 60); let seconds = timeLeft % 60;
+            document.getElementById('timer').innerText = `${minutes < 10 ? "0" + minutes : minutes}:${seconds < 10 ? "0" + seconds : seconds}`;
+        }
+
+        function updateHP() {
+            document.getElementById('p-bar').style.width = player.hp + "%";
+            document.getElementById('e-bar').style.width = enemy.hp + "%";
+        }
+
+        function playerPunch() {
+            if (!gameActive || player.punching || player.blocking) return;
+            player.punching = true;
+            let sideClass = player.leftToggle ? 'punch-left' : 'punch-right';
+            player.leftToggle = !player.leftToggle;
+            playerEl.classList.add(sideClass);
+
+            let dx = enemy.x - player.x; let dy = enemy.y - player.y; let dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < 75) {
+                enemy.hp -= player.power;
+                enemyEl.style.opacity = "0.6";
+                setTimeout(() => { enemyEl.style.opacity = "1"; }, 100);
+                if (enemy.hp <= 0) { enemy.hp = 0; playWhistleSound(); endRound(true); }
+                updateHP();
+            }
+            setTimeout(() => { playerEl.classList.remove(sideClass); player.punching = false; }, 120);
+        }
+
+        function setPlayerBlocking(isBlocking) {
+            if (!gameActive) return;
+            player.blocking = isBlocking;
+            if (isBlocking) {
+                player.speed = player.baseSpeed * 0.6; 
+                playerEl.classList.add('blocking');
+            } else {
+                player.speed = player.baseSpeed;
+                playerEl.classList.remove('blocking');
+            }
+        }
+
+        function enemyPunch() {
+            if (enemy.punching) return;
+            enemy.punching = true;
+            let sideClass = enemy.leftToggle ? 'punch-left' : 'punch-right';
+            enemy.leftToggle = !enemy.leftToggle;
+            enemyEl.classList.add(sideClass);
+
+            let dx = player.x - enemy.x; let dy = player.y - enemy.y; let dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < 75) {
+                if (player.blocking) {
+                    const pBar = document.getElementById('p-bar');
+                    pBar.style.backgroundColor = "#ecc94b";
+                    setTimeout(() => { pBar.style.backgroundColor = ""; }, 150);
+                } else {
+                    player.hp -= 12;
+                    playerEl.style.opacity = "0.6";
+                    setTimeout(() => { playerEl.style.opacity = "1"; }, 100);
+                    if (player.hp <= 0) { player.hp = 0; playWhistleSound(); endRound(false); }
+                    updateHP();
+                }
+            }
+            setTimeout(() => { enemyEl.classList.remove(sideClass); enemy.punching = false; }, 120);
+        }
+
+        function endRound(playerWonThisRound) {
+            gameActive = false; clearInterval(countdownInterval);
+            if (refereeEl) refereeEl.className = "referee gest-count";
+            if (playerWonThisRound) playerRoundsWon++; else enemyRoundsWon++;
+            document.getElementById('round-score').innerText = `${playerRoundsWon} - ${enemyRoundsWon}`;
+            if (playerRoundsWon === 3 || enemyRoundsWon === 3 || currentRound >= 4) { endChampionship(); return; }
+            currentRound++; setTimeout(prepareRound, 1000);
+        }
+
+        function endChampionship() {
+            gameActive = false; clearInterval(countdownInterval); loopInitiated = false;
+            const gameOverScreen = document.getElementById('game-over-screen');
+            const resultText = document.getElementById('result-text');
+            gameOverScreen.classList.remove('hidden');
+            if (playerRoundsWon > enemyRoundsWon) { resultText.innerText = "¡VICTORIA POR K.O. TÉCNICO! 🏆"; resultText.style.color = "#63b3ed"; }
+            else if (enemyRoundsWon > playerRoundsWon) { resultText.innerText = "DERROTA POR K.O. TÉCNICO 🥊"; resultText.style.color = "#fc8181"; }
+            else { resultText.innerText = "COMBATE EMPATADO"; resultText.style.color = "#ecc94b"; }
+        }
+
+        function gameLoop() {
+            if (gameActive) {
+                let limitX = ringBounds.width; let limitY = ringBounds.height;
+
+                // Soporte híbrido Ordenador + Móvil para Bloqueo
+                if (keys['b'] || keys['B']) { 
+                    if(!player.blocking) setPlayerBlocking(true); 
+                } else if (!joystickActive && !document.getElementById('btn-block').classList.contains('active')) { 
+                    if(player.blocking) setPlayerBlocking(false); 
+                }
+
+                // Movimiento por Ordenador (Teclado)
+                if (keys['ArrowUp'] || keys['w'] || keys['W']) moveDir.y = -1;
+                else if (keys['ArrowDown'] || keys['s'] || keys['S']) moveDir.y = 1;
+                else if (!joystickActive) moveDir.y = 0;
+
+                if (keys['ArrowLeft'] || keys['a'] || keys['A']) moveDir.x = -1;
+                else if (keys['ArrowRight'] || keys['d'] || keys['D']) moveDir.x = 1;
+                else if (!joystickActive) moveDir.x = 0;
+
+                player.x += moveDir.x * player.speed; player.y += moveDir.y * player.speed;
+                player.x = Math.max(30, Math.min(limitX - 30, player.x));
+                player.y = Math.max(30, Math.min(limitY - 30, player.y));
+
+                let edx = player.x - enemy.x; let edy = player.y - enemy.y; let edist = Math.sqrt(edx*edx + edy*edy);
+                let anglePlayer = Math.atan2(-edy, -edx);
+                playerEl.style.transform = `translate(-50%, -50%) rotate(${anglePlayer + Math.PI/2}rad)`;
+
+                if (edist > 54) { enemy.x += (edx / edist) * enemy.speed; enemy.y += (edy / edist) * enemy.speed; }
+                else { if (Math.random() < 0.08) enemyPunch(); }
+                
+                let angleEnemy = Math.atan2(edy, edx);
+                enemyEl.style.transform = `translate(-50%, -50%) rotate(${angleEnemy + Math.PI/2}rad)`;
+
+                // IA DEL ÁRBITRO (Anti-atrapamiento)
+                let midX = (player.x + enemy.x) / 2; let midY = (player.y + enemy.y) / 2;
+                let ringCenterX = limitX / 2; let ringCenterY = limitY / 2;
+
+                let targetAngle = Math.atan2(ref.y - midY, ref.x - midX);
+                let idealDist = 115;
+                let tX = midX + Math.cos(targetAngle) * idealDist;
+                let tY = midY + Math.sin(targetAngle) * idealDist;
+
+                let margin = 45;
+                if (tX < margin || tX > limitX - margin || tY < margin || tY > limitY - margin) {
+                    let toCenterFullX = ringCenterX - midX; let toCenterFullY = ringCenterY - midY;
+                    let lenCenter = Math.sqrt(toCenterFullX*toCenterFullX + toCenterFullY*toCenterFullY) || 1;
+                    tX = midX - (toCenterFullX / lenCenter) * 110; tY = midY - (toCenterFullY / lenCenter) * 110;
+                }
+
+                let pRefDist = Math.sqrt((player.x - ref.x)**2 + (player.y - ref.y)**2);
+                let eRefDist = Math.sqrt((enemy.x - ref.x)**2 + (enemy.y - ref.y)**2);
+                let closestBoxer = pRefDist < eRefDist ? player : enemy;
+                let minSelfSpace = Math.min(pRefDist, eRefDist);
+
+                if (minSelfSpace < 70) {
+                    let escapeX = ref.x - closestBoxer.x; let escapeY = ref.y - closestBoxer.y;
+                    let escapeLen = Math.sqrt(escapeX*escapeX + escapeY*escapeY) || 1;
+                    tX += (escapeX / escapeLen) * 90; tY += (escapeY / escapeLen) * 90;
+                }
+
+                tX = Math.max(38, Math.min(limitX - 38, tX)); tY = Math.max(38, Math.min(limitY - 38, tY));
+                ref.x += (tX - ref.x) * 0.07; ref.y += (tY - ref.y) * 0.07;
+
+                let rdx = midX - ref.x; let rdy = midY - ref.y; let angleRef = Math.atan2(rdy, rdx);
+                if (refereeEl) {
+                    refereeEl.style.transform = `translate(-50%, -50%) rotate(${angleRef + Math.PI/2}rad)`;
+                    if (edist < 58) refereeEl.className = "referee gest-alert"; else refereeEl.className = "referee";
+                    refereeEl.style.left = ref.x + "px"; refereeEl.style.top = ref.y + "px";
+                }
+
+                playerEl.style.left = player.x + "px"; playerEl.style.top = player.y + "px";
+                enemyEl.style.left = enemy.x + "px"; enemyEl.style.top = enemy.y + "px";
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Eventos del Teclado (PC)
+        window.addEventListener('keydown', (e) => { 
+            keys[e.key] = true; 
+            if (e.key === " " || e.key === "Spacebar") playerPunch(); 
+        });
+        window.addEventListener('keyup', (e) => { 
+            keys[e.key] = false; 
+            if (e.key === "b" || e.key === "B") setPlayerBlocking(false);
+        });
+
+        // Eventos Táctiles del Joystick (Móvil)
+        const zone = document.getElementById('joystick-zone');
+        const stick = document.getElementById('joystick-stick');
+        function handleJoystick(e) {
+            e.preventDefault(); joystickActive = true;
+            const touch = e.touches ? e.touches[0] : e; const rect = zone.getBoundingClientRect();
+            let jx = touch.clientX - (rect.left + rect.width / 2); let jy = touch.clientY - (rect.top + rect.height / 2);
+            let distance = Math.min(35, Math.sqrt(jx*jx + jy*jy)); let angle = Math.atan2(jy, jx);
+            stick.style.left = `calc(50% + ${Math.cos(angle) * distance}px)`; stick.style.top = `calc(50% + ${Math.sin(angle) * distance}px)`;
+            moveDir.x = (Math.cos(angle) * distance) / 35; moveDir.y = (Math.sin(angle) * distance) / 35;
+        }
+        zone.addEventListener('touchstart', handleJoystick, {passive: false}); 
+        zone.addEventListener('touchmove', handleJoystick, {passive: false});
+        zone.addEventListener('touchend', () => { joystickActive = false; stick.style.left = "50%"; stick.style.top = "50%"; moveDir = { x: 0, y: 0 }; });
+        
+        // Botones de pantalla híbridos (Móvil y clics de ratón en PC)
+        const punchBtn = document.getElementById('btn-punch');
+        punchBtn.addEventListener('click', playerPunch);
+        punchBtn.addEventListener('touchstart', (e) => { e.preventDefault(); playerPunch(); });
+
+        const blockBtn = document.getElementById('btn-block');
+        function startBlock(e) { e.preventDefault(); blockBtn.classList.add('active'); setPlayerBlocking(true); }
+        function endBlock(e) { e.preventDefault(); blockBtn.classList.remove('active'); setPlayerBlocking(false); }
+        
+        blockBtn.addEventListener('mousedown', startBlock);
+        blockBtn.addEventListener('mouseup', endBlock);
+        blockBtn.addEventListener('mouseleave', endBlock);
+        blockBtn.addEventListener('touchstart', startBlock, {passive: false});
+        blockBtn.addEventListener('touchend', endBlock);
+    </script>
+</body>
+</html>
